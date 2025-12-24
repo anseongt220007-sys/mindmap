@@ -1,0 +1,2278 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마스터 트래블 맵 에디터 (Smart Align)</title>
+    <style>
+        // 중복은 제거
+        /* [★ LaTeX 도움말 모달 스타일 (개선)] */
+        #latexHelpModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            /* 더 어두운 배경 */
+            z-index: 10000;
+            /* 일반 모달보다 높게 설정 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+            /* 배경에 은은한 블러 효과 */
+            transition: opacity 0.3s;
+        }
+
+        .latex-help-content {
+            background-color: #f8f9fa;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+            max-width: 950px;
+            /* <--- 가로 길이 확장 (기존 750px) */
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            /* <--- 좌우 스크롤 방지 */
+            font-family: '맑은 고딕', sans-serif;
+            text-rendering: optimizeLegibility;
+        }
+
+        .latex-help-content h2 {
+            color: #0056b3;
+            /* 메인 색상 */
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 15px;
+            margin-top: 0;
+            font-weight: 700;
+            font-size: 1.8em;
+        }
+
+        .latex-help-content h3 {
+            color: #495057;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+            border-left: 4px solid #adb5bd;
+            /* 왼쪽 세로줄로 구분 */
+            padding-left: 10px;
+        }
+
+        .latex-help-content ul {
+            list-style-type: none;
+            /* 기본 점 제거 */
+            padding-left: 0;
+        }
+
+        .latex-help-content li {
+            margin-bottom: 10px;
+            background-color: #ffffff;
+            /* 리스트 항목 배경 */
+            padding: 10px 15px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            border: 1px solid #e9ecef;
+        }
+
+        .latex-help-content li strong {
+            color: #007bff;
+            min-width: 80px;
+            /* 용어 고정 너비 */
+            margin-right: 15px;
+            font-weight: 600;
+        }
+
+        /* 코드 블록 스타일 수정 */
+        .latex-help-content li code {
+            font-family: Consolas, 'Courier New', monospace;
+            /* 코드 폰트 변경 */
+            font-size: 0.95em;
+            background-color: #e9ecef;
+            padding: 3px 6px;
+            border-radius: 4px;
+            color: #495057;
+            /* <-- 코드 입력 색상을 진한 회색으로 변경 (기존 빨간색 계열) */
+            white-space: nowrap;
+            overflow-x: auto;
+        }
+
+        /* MathJax로 렌더링된 수식 (span.mjx-chtml) 스타일 추가 */
+        /* 도움말 모달 내의 모든 MathJax 렌더링 결과에 적용되어 선명하게 보입니다. */
+        .latex-help-content .mjx-chtml {
+            color: #007bff;
+            /* <-- 렌더링된 수식을 파란색(메인 색상)으로 지정하여 선명하게 만듦 */
+            font-weight: 600;
+            /* 수식 굵게 */
+            font-size: 1.1em;
+            /* 수식 크기 약간 키움 */
+        }
+
+
+
+        /* 추가 레이아웃 (두 열 배치) */
+        .flex-columns {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            /* 작은 화면에서 줄 바꿈 허용 */
+        }
+
+        .flex-columns>div {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .close-info {
+            text-align: center;
+            font-size: 1em;
+            color: #6c757d;
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px dashed #ced4da;
+        }
+
+        //중복은 제거 끝
+
+
+        /* [레이아웃] */
+        html,
+        body {
+            font-family: '맑은 고딕', sans-serif;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            background: #f0f0f0;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* [상단 툴바] */
+        .toolbar {
+            padding: 8px;
+            background: #f5f5f5;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+            border-bottom: 1px solid #ddd;
+            flex-shrink: 0;
+            z-index: 10;
+            height: auto;
+            min-height: 40px;
+        }
+
+        /* [탭 영역] */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: #e8e8e8;
+            padding: 0 10px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            height: 40px;
+            align-items: flex-end;
+            flex-shrink: 0;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .tab {
+            padding: 0 20px;
+            background: #d0d0d0;
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            border-radius: 10px 10px 0 0;
+            font-size: 14px;
+            color: #555;
+            transition: all 0.2s;
+            margin-bottom: 0;
+            border: 1px solid #ccc;
+            border-bottom: none;
+            height: 30px;
+            display: flex;
+            align-items: center;
+        }
+
+        .tab.active {
+            background: #fff;
+            font-weight: bold;
+            color: #000;
+            height: 35px;
+            font-size: 15px;
+            position: relative;
+            z-index: 5;
+            border-color: #ccc;
+            border-bottom: 1px solid #fff;
+            margin-bottom: -1px;
+            box-shadow: 0 -2px 3px rgba(0, 0, 0, 0.05);
+            cursor: default;
+        }
+
+        .tab:hover:not(.active) {
+            background: #e0e0e0;
+        }
+
+        /* [작업 영역] */
+        .workspace {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            padding: 0;
+            background: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            cursor: default;
+        }
+
+        .workspace.grab {
+            cursor: grab;
+        }
+
+        .workspace.grabbing {
+            cursor: grabbing;
+        }
+
+        .container {
+            position: relative;
+            border: 1px solid #ddd;
+            margin: 0;
+            width: calc(70vw * 1.414);
+            height: 70vw;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: cover;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.08);
+            background-color: #fff;
+            flex-shrink: 0;
+            transition: background-size 0.2s, background-position 0.2s;
+        }
+
+        /* [박스 공통 스타일] */
+        .box {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+            z-index: 2;
+            display: flex;
+            flex-wrap: wrap;
+            /* <--- 이 줄을 추가합니다. */
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-sizing: border-box;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.4;
+            overflow: hidden;
+        }
+
+        .box.normal {
+            padding: 5px 10px;
+            border: 1px solid #999;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .box.dot {
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            padding: 0;
+            font-size: 0;
+            color: transparent;
+        }
+
+        .box.dot:hover {
+            transform: scale(1.2);
+            transition: transform 0.1s;
+        }
+
+        /* [선택 스타일 개선] */
+        /* 기준 박스 (첫번째 선택) - 빨강 */
+        .box.selected.primary {
+            outline: 3px solid #ff0000;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        /* 추가 박스 (나머지) - 파랑 */
+        .box.selected.secondary {
+            outline: 2px solid #007bff;
+            box-shadow: 0 0 8px rgba(0, 123, 255, 0.4);
+        }
+
+        .group-rect {
+            position: absolute;
+            border: 2px dashed #999;
+            background-color: rgba(0, 0, 0, 0.03);
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 0;
+            transition: all 0.1s ease;
+        }
+
+        .color-swatch {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            border: 1px solid #bbb;
+            border-radius: 3px;
+            transition: transform 0.1s;
+            flex-shrink: 0;
+        }
+
+        .color-swatch:hover {
+            transform: scale(1.2);
+            border-color: #333;
+            z-index: 10;
+        }
+
+        #palette {
+            display: flex;
+            gap: 2px;
+            padding-left: 5px;
+            align-items: center;
+            flex-wrap: nowrap;
+            overflow: visible;
+            width: auto;
+        }
+
+        #paletteArea {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            border-left: 1px solid #ccc;
+            padding-left: 10px;
+            margin-left: 10px;
+        }
+
+        #paletteArea.hidden {
+            display: none !important;
+        }
+
+        .linkLine {
+            position: absolute;
+            background: #333;
+            height: 2px;
+            transform-origin: 0 0;
+            z-index: 1;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+
+        .linkLine:hover {
+            height: 4px;
+            background: #0099ff;
+        }
+
+        .linkLine.arrow::after {
+            content: '';
+            position: absolute;
+            right: -2px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-left: 12px solid #333;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+        }
+
+        .linkLine:hover.arrow::after {
+            border-left-color: #0099ff;
+        }
+
+        .linkLine.red {
+            background-color: #ff4d4d;
+        }
+
+        .linkLine.red::after {
+            border-left-color: #ff4d4d;
+        }
+
+        .linkLine.red:hover {
+            background-color: #ff8080;
+        }
+
+        .linkLine.red:hover::after {
+            border-left-color: #ff8080;
+        }
+
+        .linkLine.blue {
+            background-color: #007bff;
+        }
+
+        .linkLine.blue::after {
+            border-left-color: #007bff;
+        }
+
+        .resizeHandle {
+            width: 12px;
+            height: 12px;
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            cursor: se-resize;
+            background: linear-gradient(135deg, transparent 50%, #888 50%);
+            z-index: 3;
+        }
+
+        .box.dot .resizeHandle {
+            display: none;
+        }
+
+        /* 모달 및 UI */
+        #helpModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(3px);
+        }
+
+        #helpModalContent {
+            background: #fff;
+            padding: 30px;
+            border-radius: 16px;
+            width: 800px;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        #closeHelp {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #888;
+        }
+
+        kbd {
+            display: inline-block;
+            padding: 2px 6px;
+            font-family: monospace;
+            font-size: 11px;
+            background-color: #f7f7f7;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .sep {
+            width: 1px;
+            height: 20px;
+            background: #ccc;
+            margin: 0 5px;
+        }
+
+        .btn-primary {
+            color: #0044cc;
+            font-weight: bold;
+        }
+
+        .btn-success {
+            color: #007700;
+            font-weight: bold;
+        }
+
+        .btn-dot {
+            color: #cc0000;
+            font-weight: bold;
+            background-color: #fff0f0;
+            border: 1px solid #ffcccc;
+        }
+
+
+
+        .auto-save-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: transparent;
+            /* 배경 투명하게 */
+            color: #007bff !important;
+            /* 글씨 색상: 파란색 */
+            padding: 0;
+            /* 안쪽 여백 제거 */
+            border-radius: 0;
+            /* 둥근 모서리 제거 */
+            font-size: 14px;
+            font-weight: normal;
+            box-shadow: none;
+            /* 박스 그림자 제거 */
+            z-index: 9999;
+            display: none;
+            pointer-events: none;
+        }
+
+
+
+        .btn-align {
+            padding: 2px 6px;
+            font-size: 14px;
+            min-width: 30px;
+        }
+
+        select {
+            padding: 2px 4px;
+            font-size: 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            max-width: 140px;
+        }
+
+        #currentFileName {
+            font-size: 12px;
+            font-weight: bold;
+            color: #666;
+            margin-right: 10px;
+            background: #fff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            display: none;
+        }
+
+        /* [★ 추가할 코드] 도움말 모달 스타일 */
+        #latexHelpModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            /* 반투명 검은색 배경 */
+            z-index: 1000;
+            /* 다른 모든 요소 위에 표시 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .help-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            /* 최대 높이 설정 */
+            overflow-y: auto;
+            /* 내용이 넘칠 경우 스크롤 */
+        }
+
+        .help-content h2 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        .help-content h3 {
+            color: #555;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+
+        .help-content ul {
+            list-style-type: disc;
+            padding-left: 20px;
+            margin-top: 5px;
+        }
+
+        .help-content li {
+            margin-bottom: 5px;
+            font-family: monospace;
+            /* 코드는 고정폭 글꼴로 */
+        }
+
+        .close-info {
+            text-align: right;
+            font-size: 0.9em;
+            color: #999;
+            margin-top: 20px;
+        }
+    </style>
+    <div id="latexHelpModal" style="display:none;">
+        <div class="latex-help-content">
+            <h2>$\sum$ TeX / LaTeX 수식 문법 도움말</h2>
+            <p style="margin-bottom:20px; color:#555;">
+                선택한 박스에 입력하는 내용이 MathJax를 통해 실시간으로 수식으로 렌더링됩니다.
+            </p>
+
+            <div class="flex-columns">
+                <div class="help-column">
+                    <h3>📌 기본 구조 및 표기법</h3>
+                    <ul>
+                        <li><strong>인라인 수식:</strong> <code>\$ \sum_{i=1}^n i \$</code><br /> 결과: <span
+                                class="math-result">\(\sum_{i=1}^n i\)</span></li>
+                        <li><strong>블록 수식:</strong> <code>\$\$ E=mc^2 \$\$</code><br /> (새 줄에 가운데 정렬)</li>
+                        <li><strong>분수:</strong> <code>\frac{분자}{분모}</code><br /> 결과: <span
+                                class="math-result">\(\frac{1}{2}\)</span></li>
+                        <li><strong>제곱/첨자:</strong> <code>x^2</code>, <code>y_i</code><br /> 결과: <span
+                                class="math-result">\(x_i^2\)</span></li>
+                        <li><strong>제곱근:</strong> <code>\sqrt{내용}</code><br /> 결과: <span
+                                class="math-result">\(\sqrt{x^2+y^2}\)</span></li>
+                        <li><strong>행렬/벡터:</strong> <code>\begin{pmatrix} ... \end{pmatrix}</code></li>
+                    </ul>
+                </div>
+
+                <div class="help-column">
+                    <h3>➗ 자주 사용되는 함수/기호</h3>
+                    <ul>
+                        <li><strong>합계:</strong> <code>\sum_{아래}^{위}</code><br /> 결과: <span
+                                class="math-result">\(\sum_{i=0}^{\infty} i^2\)</span></li>
+                        <li><strong>적분:</strong> <code>\int_{아래}^{위}</code><br /> 결과: <span
+                                class="math-result">\(\int_0^1 f(x)dx\)</span></li>
+                        <li><strong>극한:</strong> <code>\lim_{n \to \infty}</code><br /> 결과: <span
+                                class="math-result">\(\lim_{x \to 0} \frac{\sin x}{x}\)</span></li>
+                        <li><strong>이항 계수:</strong> <code>\binom{n}{k}</code><br /> 결과: <span
+                                class="math-result">\(\binom{n}{k}\)</span></li>
+                        <li><strong>논리 기호:</strong> <code>\forall</code>, <code>\exists</code>, <code>\land</code>,
+                            <code>\lor</code>
+                        </li>
+                        <li><strong>화살표:</strong> <code>\to</code>, <code>\leftarrow</code>,
+                            <code>\leftrightarrow</code>, <code>\implies</code>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <p class="close-info">
+                도움말 닫기: <kbd>F1</kbd> 또는 <kbd>ESC</kbd> 키, 혹은 아무 곳이나 클릭
+            </p>
+        </div>
+    </div>
+
+    <style>
+        /* 추가: 수식 결과 렌더링을 위한 컨테이너 스타일 */
+        .math-result {
+            display: block;
+            margin: 5px 0 0 0;
+            padding: 5px;
+            background-color: #e3f2fd;
+            /* 밝은 파란색 배경 */
+            border-radius: 4px;
+            text-align: left;
+        }
+    </style>
+
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+
+    <div class="toolbar">
+        <div class="btn-group">
+            <button id="handToolBtn" title="이동 모드 (Space 키)">🖐 손도구</button>
+            <div class="sep" style="height:15px; margin:0 2px;"></div>
+            <button id="addContainerBtn">📄 탭 추가</button>
+            <button id="deleteContainerBtn" style="color:#d32f2f;">❌ 탭 삭제</button>
+            <button id="addBoxBtn">📦 박스</button>
+            <button id="addDotBtn" class="btn-dot">🔴 점 추가</button>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="btn-group">
+            <button onclick="groupSelectedBoxes()" title="선택한 박스 묶기">🔗 묶기</button>
+            <button onclick="ungroupSelectedBoxes()" title="그룹 해제">🔓 풀기</button>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="btn-group">
+            <button class="btn-align" id="alignLeftBtn" title="왼쪽 정렬">⬅</button>
+            <button class="btn-align" id="alignCenterBtn" title="가로 중앙 정렬">║</button>
+            <button class="btn-align" id="alignRightBtn" title="오른쪽 정렬">➡</button>
+            <button class="btn-align" id="alignTopBtn" title="위쪽 정렬">⬆</button>
+            <button class="btn-align" id="alignMiddleBtn" title="세로 중앙 정렬">═</button>
+            <button class="btn-align" id="alignBottomBtn" title="아래쪽 정렬">⬇</button>
+            <button class="btn-align" id="matchWidthBtn" title="기준(빨강) 박스와 너비 같게 (기준박스 Shift+클릭)">↔ 너비동일</button>
+        </div>
+
+        <div class="sep"></div>
+        <div class="btn-group">
+            <button class="btn-align" onclick="setTextAlign('left')" title="글자 왼쪽 정렬">T⇠</button>
+            <button class="btn-align" onclick="setTextAlign('center')" title="글자 중앙 정렬">T|</button>
+            <button class="btn-align" onclick="setTextAlign('right')" title="글자 오른쪽 정렬">T⇢</button>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="btn-group">
+            <button id="openProjectBtn" class="btn-primary" style="color:#e65100; border:1px solid #ffcc80;">📂
+                열기</button>
+            <div class="sep" style="height:15px; margin:0 2px;"></div>
+
+            <select id="saveModeSelect" ...>
+                <option value="all">📁 모든 탭 저장 (스마트 저장)</option>
+                <option value="saveas">💾 다른 이름으로 저장</option>
+                <option value="selected">⭐ 선택 항목 내보내기</option>
+                <option value="single">📤 현재 탭 내보내기</option>
+                <option value="folder">📂 모든 탭 폴더 백업</option>
+            </select>
+            <button id="executeSaveBtn" class="btn-primary">✅ 실행</button>
+        </div>
+
+        <div class="sep"></div>
+        <div class="btn-group">
+            <button id="importBtn" class="btn-success">➕ 합치기</button>
+            <input type="file" id="importFile" accept=".json" style="display:none" />
+            <button id="resetDataBtn" style="color:#cc0000;">🗑️ 초기화</button>
+        </div>
+
+        <div class="sep"></div>
+
+
+        <div class="btn-group">
+            <input type="range" id="containerGray" min="0" max="255" value="255" title="배경 밝기" style="width:60px">
+            <button id="setBgImgBtn">🖼 배경</button>
+            <select id="bgModeSelect" title="배경 표시 방식" style="width: 100px;">
+                <option value="cover-center">꽉 채우기</option>
+                <option value="contain-center">전체(중앙)</option>
+                <option value="contain-topleft">전체(좌상)</option>
+                <option value="contain-topright">전체(우상)</option>
+                <option value="auto-center">원본(중앙)</option>
+                <option value="auto-topleft">원본(좌상)</option>
+                <option value="stretch">화면 맞춤</option>
+            </select>
+            <button id="clearBgImgBtn">❌ 삭제</button>
+            <input type="file" id="bgImageInput" accept="image/*" style="display:none">
+        </div>
+
+        <div class="sep"></div>
+
+        <button id="exportPNG">📷 캡처</button>
+        <button id="helpBtn" style="background:#ffeb3b; border:1px solid #ccc;">💡 도움말</button>
+
+        <div class="sep"></div>
+
+        <button id="togglePaletteBtn">🎨 색상</button>
+        <div id="paletteArea">
+            <span> </span>
+            <div id="palette"></div>
+        </div>
+
+        <span id="currentFileName">파일명 없음</span>
+        <span id="autoSaveMsg" class="auto-save-status">✔ 자동 저장됨</span>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+    <div class="workspace" id="workspace">
+        <div id="containerArea" class="container"></div>
+    </div>
+
+    <div id="helpModal">
+
+        <div id="helpModalContent">
+            <button id="closeHelp">✖</button>
+            <h2 style="border-bottom:2px solid #0099ff; padding-bottom:10px; color:#0055aa; margin-top:0;">
+                📘 스마트 트래블 맵 에디터 매뉴얼
+            </h2>
+
+            <div style="display:flex; gap:20px; flex-wrap:wrap;">
+
+                <div style="flex:1; min-width:300px;">
+                    <h3 style="color:#333; border-left:4px solid #0099ff; padding-left:8px;">🖱️ 기본 조작</h3>
+                    <ul style="line-height:1.6; color:#555; padding-left:20px;">
+                        <li><strong>박스 선택:</strong> 클릭 (하나 선택) / <kbd>Ctrl</kbd>+클릭 (여러 개 추가 선택)</li>
+                        <li><strong>드래그 선택:</strong> 빈 공간에서 마우스 드래그</li>
+                        <li><strong>이동/크기:</strong> 박스 드래그 / 우측 하단 핸들로 크기 조절</li>
+                        <li><strong>텍스트 편집:</strong> 박스 더블 클릭</li>
+                        <li><strong>복제/삭제:</strong> <kbd>Ctrl</kbd>+<kbd>D</kbd> (복제), <kbd>Delete</kbd> (삭제)</li>
+                        <li><strong>실행 취소:</strong> <kbd>Ctrl</kbd>+<kbd>Z</kbd> (취소), <kbd>Ctrl</kbd>+<kbd>Y</kbd> (다시
+                            실행)</li>
+                    </ul>
+
+                    <h3 style="color:#333; border-left:4px solid #ff9800; padding-left:8px;">✨ 그룹 & 색상</h3>
+                    <ul style="line-height:1.6; color:#555; padding-left:20px;">
+                        <li><strong>그룹 묶기:</strong> 여러 개 선택 후 [🔗 묶기] 버튼</li>
+                        <li><strong>그룹 색상:</strong> 그룹 선택 후 상단 [🎨 색상]에서 색 선택</li>
+                        <li><strong>연결선:</strong> 박스 연속 클릭 (또는 Shift+클릭)으로 연결</li>
+                        <li><strong>선 꾸미기:</strong> 선 클릭(화살표), Shift+클릭(색상변경), Alt+클릭(삭제)</li>
+                    </ul>
+                </div>
+
+                <div style="flex:1; min-width:300px;">
+                    <h3 style="color:#333; border-left:4px solid #4caf50; padding-left:8px;">📐 정렬 & 배치</h3>
+                    <ul style="line-height:1.6; color:#555; padding-left:20px;">
+                        <li><strong>자동 정렬:</strong> 여러 개 선택 후 상단 정렬 아이콘(⬅,║,➡,⬆...) 클릭</li>
+                        <li><strong>너비 맞춤:</strong> 여러 개 선택 후 <strong>기준(빨강) 박스</strong>를 <kbd>Shift</kbd>+클릭 하거나 상단 [↔
+                            너비동일] 버튼 클릭</li>
+                        <li><strong>글자 정렬:</strong> [T⇠] [T|] [T⇢] 버튼으로 텍스트 정렬 변경</li>
+                    </ul>
+
+                    <h3 style="color:#333; border-left:4px solid #9c27b0; padding-left:8px;">📂 탭(Tab) 관리 & 저장</h3>
+                    <ul style="line-height:1.6; color:#555; padding-left:20px;">
+                        <li><strong>탭 순서 변경:</strong> 탭을 드래그하여 순서 바꾸기</li>
+                        <li><strong>박스 탭 이동:</strong> 박스 선택 후, 옮길 탭을 <kbd>Shift</kbd>+<kbd>Ctrl</kbd>+클릭 (위치 유지)</li>
+                        <li><strong>탭 이름 변경:</strong> 탭 더블 클릭</li>
+                        <li><strong>저장:</strong> <kbd>Ctrl</kbd>+<kbd>S</kbd> (프로젝트 저장) / 자동 저장 지원</li>
+                        <li><strong>배경 설정:</strong> 하단 슬라이더(밝기), [🖼 배경] 이미지 삽입</li>
+                    </ul>
+                </div>
+            </div>
+
+            <p
+                style="background:#f0f8ff; padding:10px; border-radius:5px; border:1px solid #bde0ff; margin-top:20px; font-size:0.95em;">
+                <strong>💡 팁:</strong> 화면을 이동하려면 <kbd>Space</kbd> 키를 누른 채 드래그하거나, 상단의 [🖐 손도구] 버튼을 사용하세요.
+            </p>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script>
+
+        document.addEventListener('keydown', e => {
+            // F1 키 감지
+            if (e.key === 'F1') {
+                e.preventDefault();
+
+                const modal = document.getElementById('latexHelpModal');
+                // 현재 숨겨져 있으면 표시, 표시되어 있으면 숨김
+                if (modal.style.display === 'none') {
+                    modal.style.display = 'flex';
+
+                    // [★ 수정] 모달이 열릴 때 MathJax 렌더링을 수동으로 호출하여 수식 보이게 함
+                    // MathJax가 로드되었는지 확인하고, 모달 요소만 렌더링하도록 지정
+                    if (typeof MathJax !== 'undefined' && MathJax.typeset) {
+                        MathJax.typeset([modal]);
+                    }
+
+                } else {
+                    modal.style.display = 'none';
+                }
+            }
+
+            // ESC 키 감지 (도움말 창 닫기용)
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('latexHelpModal');
+                if (modal && modal.style.display !== 'none') {
+                    modal.style.display = 'none';
+                }
+            }
+        });
+
+
+        // 모달 외부 클릭 시 닫기 기능 추가 (선택 사항)
+        document.getElementById('latexHelpModal').addEventListener('click', function (e) {
+            // 클릭된 요소가 도움말 내용(.help-content) 자체가 아닐 경우에만 닫기
+            if (e.target.id === 'latexHelpModal') {
+                e.target.style.display = 'none';
+            }
+        });
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            let containers = [], boxes = [], activeContainerId = null;
+
+            // [기존 코드]
+            let selectedBoxIds = [], linkLines = [], linkingBoxId = null;
+            let dragSelectRect = null, dragStart = null;
+
+            // [★ 추가할 코드] 그룹 색상을 저장할 객체
+            let groupColors = {};
+
+            const STORAGE_KEY = 'myMapEditorData_smartAlign';
+
+            let isSpacePressed = false;
+            let isHandMode = false;
+            let isPanning = false;
+            let panStartX = 0, panStartY = 0;
+            let scrollStartX = 0, scrollStartY = 0;
+
+            let currentFileHandle = null;
+
+            const colors = [
+                '#ff0000', '#ffffff', '#f1f3f5', '#e9ecef', '#dee2e6',
+                '#fff9db', '#fff3bf', '#ffec99', '#ffe066',
+                '#ffe8cc', '#ffd8a8', '#ffc078', '#ffa94d',
+                '#ffc9c9', '#ff8787', '#fa5252', '#fcc2d7',
+                '#eebefa', '#cc5de8', '#d0bfff', '#b197fc',
+                '#d0ebff', '#74c0fc', '#4dabf7', '#339af0',
+                '#e3fafc', '#99e9f2', '#66d9e8', '#22b8cf',
+                '#d3f9d8', '#b2f2bb', '#69db7c', '#40c057',
+                '#f4fce3', '#d8f5a2', '#a9e34b', '#82c91e'
+            ];
+
+            const palette = document.getElementById('palette');
+            const paletteArea = document.getElementById('paletteArea');
+            const togglePaletteBtn = document.getElementById('togglePaletteBtn');
+            const handToolBtn = document.getElementById('handToolBtn');
+
+            const workspace = document.getElementById('workspace');
+            const containerArea = document.getElementById('containerArea');
+            const graySlider = document.getElementById('containerGray');
+            const bgModeSelect = document.getElementById('bgModeSelect');
+            const saveModeSelect = document.getElementById('saveModeSelect');
+            const autoSaveMsg = document.getElementById('autoSaveMsg');
+            const currentFileNameSpan = document.getElementById('currentFileName');
+
+            let undoStack = [], redoStack = [], MAX_HISTORY = 50;
+            const selectionHistoryStack = [];
+
+            togglePaletteBtn.onclick = () => {
+                if (paletteArea.classList.contains('hidden')) {
+                    paletteArea.classList.remove('hidden');
+                    togglePaletteBtn.style.background = '';
+                } else {
+                    paletteArea.classList.add('hidden');
+                    togglePaletteBtn.style.background = '#ddd';
+                }
+            };
+
+            handToolBtn.onclick = () => {
+                isHandMode = !isHandMode;
+                if (isHandMode) {
+                    handToolBtn.style.background = '#ffe082';
+                    handToolBtn.style.border = '1px solid #ffca28';
+                    workspace.classList.add('grab');
+                } else {
+                    handToolBtn.style.background = '';
+                    handToolBtn.style.border = '';
+                    workspace.classList.remove('grab');
+                }
+            };
+
+            function saveToLocalStorage() {
+                const data = { containers, boxes, linkLines, activeContainerId, groupColors };
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                    autoSaveMsg.textContent = "✔ 자동 저장됨";
+                    autoSaveMsg.style.display = 'block';
+                    setTimeout(() => { autoSaveMsg.style.display = 'none'; }, 1000);
+                } catch (e) {
+                    console.warn("Local Storage Quota Exceeded");
+                }
+            }
+
+
+            //====================
+            function loadFromLocalStorage() {
+                const dataStr = localStorage.getItem(STORAGE_KEY);
+                if (dataStr) {
+                    try {
+                        const data = JSON.parse(dataStr); // data 변수 생성
+
+                        containers = data.containers || [];
+                        boxes = data.boxes || [];
+                        linkLines = data.linkLines || [];
+                        activeContainerId = data.activeContainerId || (containers[0] ? containers[0].id : null);
+
+                        // [★ 위치 확인] 여기도 data가 만들어진 뒤에 있어야 합니다.
+                        groupColors = data.groupColors || {};
+
+                    } catch (e) { console.error(e); }
+                }
+            }
+
+
+
+            function pushHistory() {
+                try {
+                    undoStack.push(JSON.stringify({ containers, boxes, linkLines, activeContainerId, groupColors }));
+                    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+                    redoStack = [];
+                    saveToLocalStorage();
+                } catch (e) { console.warn("History push failed"); }
+            }
+
+            function undo() { if (!undoStack.length) return; redoStack.push(JSON.stringify({ containers, boxes, linkLines, activeContainerId })); const last = JSON.parse(undoStack.pop()); containers = last.containers; boxes = last.boxes; linkLines = last.linkLines; activeContainerId = last.activeContainerId; selectedBoxIds = []; renderTabs(); renderBoxes(); saveToLocalStorage(); }
+            function redo() { if (!redoStack.length) return; undoStack.push(JSON.stringify({ containers, boxes, linkLines, activeContainerId })); const next = JSON.parse(redoStack.pop()); containers = next.containers; boxes = next.boxes; linkLines = next.linkLines; activeContainerId = next.activeContainerId; selectedBoxIds = []; renderTabs(); renderBoxes(); saveToLocalStorage(); }
+
+            function createContainer(name) {
+                const id = 'c' + Date.now() + Math.random().toString(16).slice(2);
+                containers.push({ id, name, bg: 255, bgImage: null, bgMode: 'cover-center' });
+                setActiveContainer(id); renderTabs(); pushHistory();
+            }
+
+            function setActiveContainer(id) {
+                if (!id) return;
+                activeContainerId = id;
+                renderTabs();
+                const container = containers.find(c => c.id === activeContainerId);
+                if (container) {
+                    graySlider.value = container.bg;
+                    bgModeSelect.value = container.bgMode || 'cover-center';
+                }
+                renderBoxes();
+            }
+            // [수정] 슬라이더 드래그 중에는 화면만 갱신 (히스토리 저장 X)
+            graySlider.oninput = () => {
+                if (!activeContainerId) return;
+                const c = containers.find(c => c.id === activeContainerId);
+                if (!c) return;
+                c.bg = parseInt(graySlider.value);
+                renderBoxes();
+            };
+
+            // [추가] 슬라이더 조작이 끝났을 때(마우스 뗐을 때) 히스토리 저장
+            graySlider.onchange = () => {
+                pushHistory();
+            };
+            bgModeSelect.onchange = (e) => {
+                if (!activeContainerId) return;
+                const c = containers.find(c => c.id === activeContainerId);
+                if (c) {
+                    c.bgMode = e.target.value;
+                    renderBoxes();
+                    pushHistory();
+                }
+            };
+
+
+
+            //=======================================================================
+
+            // [★ 최종 통합: 탭 드래그 순서 변경 + Shift+Ctrl 클릭으로 '모양 유지' 이동]
+            function renderTabs() {
+                const tabsEl = document.querySelector('.tabs');
+                tabsEl.innerHTML = '';
+
+                containers.forEach((c, index) => {
+                    const tab = document.createElement('div');
+                    tab.className = 'tab' + (c.id === activeContainerId ? ' active' : '');
+                    tab.textContent = c.name;
+
+                    // ===============================================
+                    // [기능 1] 탭 드래그 앤 드롭 (순서 변경)
+                    // ===============================================
+                    tab.draggable = true; // 드래그 가능 설정
+
+                    // 드래그 시작: 현재 탭의 위치(index) 기억
+                    tab.ondragstart = (e) => {
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('fromIndex', index);
+                        tab.style.opacity = '0.5'; // 흐리게 효과
+                    };
+
+                    // 드래그 종료: 효과 복구
+                    tab.ondragend = () => { tab.style.opacity = '1'; };
+
+                    // 드래그 중: 놓기 허용
+                    tab.ondragover = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
+
+                    // 드롭(놓기): 순서 교체 실행
+                    tab.ondrop = (e) => {
+                        e.preventDefault();
+                        const fromIndex = parseInt(e.dataTransfer.getData('fromIndex'));
+                        const toIndex = index;
+
+                        // 제자리 드롭이면 무시
+                        if (fromIndex === toIndex) return;
+
+                        // 배열에서 빼서(splice) -> 새 위치에 넣기(splice)
+                        const movedItem = containers.splice(fromIndex, 1)[0];
+                        containers.splice(toIndex, 0, movedItem);
+
+                        renderTabs();
+                        pushHistory();
+                    };
+
+                    // [기능 2] 탭 클릭 이벤트 (탭 전환 OR 박스 이동)
+                    tab.onclick = (e) => {
+                        // 조건: Shift + Ctrl 키를 누른 상태인가?
+                        if (e.shiftKey && (e.ctrlKey || e.metaKey)) {
+                            // 검증 1: 선택된 박스가 있는가?
+                            if (selectedBoxIds.length === 0) {
+                                alert('이동할 박스를 먼저 선택해주세요.');
+                                return;
+                            }
+                            // 검증 2: 현재 탭으로 이동하려고 하는가?
+                            if (c.id === activeContainerId) {
+                                alert('현재 보고 있는 탭입니다.');
+                                return;
+                            }
+
+                            // -----------------------------------------------------------
+                            // [★ 추가할 코드 시작] 선택된 박스에 연결된 '그룹 전체'를 자동으로 포함하기
+                            // -----------------------------------------------------------
+                            let boxesToMove = boxes.filter(b => selectedBoxIds.includes(b.id));
+
+                            // 1. 선택된 박스들이 속한 모든 그룹 ID 수집
+                            const relatedGroupIds = new Set();
+                            boxesToMove.forEach(b => {
+                                if (b.groupIds && b.groupIds.length > 0) {
+                                    b.groupIds.forEach(gid => relatedGroupIds.add(gid));
+                                }
+                            });
+
+                            // 2. 해당 그룹 ID를 가진 현재 탭의 모든 박스를 이동 목록에 추가
+                            if (relatedGroupIds.size > 0) {
+                                const groupMembers = boxes.filter(b =>
+                                    b.containerId === activeContainerId &&
+                                    b.groupIds &&
+                                    b.groupIds.some(gid => relatedGroupIds.has(gid))
+                                );
+
+                                groupMembers.forEach(member => {
+                                    // 이미 이동 목록에 없으면 추가
+                                    if (!boxesToMove.includes(member)) {
+                                        boxesToMove.push(member);
+                                    }
+                                });
+                            }
+                            // [★ 추가할 코드 끝] -----------------------------------------
+
+
+                            // --- [기존 박스 이동 로직: boxesToMove 변수 사용] ---
+                            // (기존 코드에서는 selectedBoxIds로 필터링했으나, 이제 boxesToMove를 사용해야 합니다)
+
+                            // 1. 기준점 찾기 (가장 왼쪽/위쪽)
+                            let minX = Infinity; let minY = Infinity;
+
+                            // [수정] 위에서 만든 boxesToMove 배열을 사용하세요
+                            boxesToMove.forEach(b => {
+                                if (b.x < minX) minX = b.x;
+                                if (b.y < minY) minY = b.y;
+                            });
+
+                            // 2. 이동 실행
+                            boxesToMove.forEach(b => {
+                                b.containerId = c.id; // 소속 탭 변경
+
+                                // 새 탭의 (50, 50) 위치를 기준으로 모양 유지하며 배치
+                                b.x = 50 + (b.x - minX);
+                                b.y = 50 + (b.y - minY);
+                            });
+
+                            // 3. 연결선 처리 (양쪽 끝이 모두 이동한 경우에만 유지됨)
+                            // 이동한 박스들의 ID 목록
+                            const movedIds = boxesToMove.map(b => b.id);
+
+                            // 연결선도 탭 정보를 따라가게 하거나, 로직에 따라 처리 (보통 박스만 옮기면 됨)
+                            // 만약 연결선 데이터에 containerId가 없다면 박스만 옮겨도 렌더링 시 자동으로 따라옵니다.
+
+                            // 4. 마무리
+                            selectedBoxIds = []; // 선택 해제
+                            renderBoxes();       // 현재 화면(박스가 사라짐) 갱신
+                            pushHistory();       // 기록 저장
+
+                            // (선택 사항) 이동 후 알림
+                            // alert(`${boxesToMove.length}개의 박스(그룹 포함)가 '${c.name}' 탭으로 이동되었습니다.`);
+                            return;
+                        }
+
+                        // [기존 기능: 단순 탭 전환]
+                        activeContainerId = c.id;
+                        renderTabs();
+                        renderBoxes();
+                    };
+
+
+
+
+
+
+                    // [기타] 더블클릭 시 이름 변경
+                    tab.ondblclick = (e) => {
+                        e.stopPropagation();
+                        const newName = prompt('탭 이름 변경:', c.name);
+                        if (newName) {
+                            c.name = newName;
+                            renderTabs();
+                            pushHistory();
+                        }
+                    };
+
+                    tabsEl.appendChild(tab);
+                });
+
+                // [+] 버튼 추가
+                const addBtn = document.createElement('button');
+                addBtn.textContent = '+';
+                addBtn.style.padding = '5px 10px';
+                addBtn.style.cursor = 'pointer';
+                addBtn.style.border = 'none';
+                addBtn.style.background = 'transparent';
+                addBtn.style.fontSize = '1.2rem';
+                addBtn.onclick = () => {
+                    const name = prompt('새 탭 이름:');
+                    if (name) {
+                        const newId = 'c' + Date.now();
+                        containers.push({ id: newId, name: name });
+                        activeContainerId = newId;
+                        renderTabs();
+                        renderBoxes();
+                        pushHistory();
+                    }
+                };
+                tabsEl.appendChild(addBtn);
+            }
+            //========================================================================
+            function createBox(type = 'normal') {
+                if (!activeContainerId) return alert('먼저 탭(컨테이너)을 추가해주세요.');
+                const id = 'b' + Date.now() + Math.random().toString(16).slice(2);
+                let box = { id, containerId: activeContainerId, x: 50, y: 50, type: type };
+                if (type === 'dot') { box.text = ''; box.color = '#ff0000'; box.width = 24; box.height = 24; }
+                else { box.text = '새 박스'; box.color = '#fff9db'; box.width = 100; box.height = 40; }
+                boxes.push(box); renderBoxes(); pushHistory();
+            }
+
+            //=수학 기호 사용을 위한 노력
+            // [새로 추가할 함수]: 박스의 내용을 HTML로 할당하고 MathJax가 인식하도록 준비합니다.
+            function setBoxContent(boxElement, text) {
+                boxElement.innerHTML = text || '';
+            }
+            //======================
+            //================
+            // [★ 수정할 코드] renderGroups 함수 전체 교체
+            function renderGroups() {
+                document.querySelectorAll('.group-rect').forEach(el => el.remove());
+                const activeBoxes = boxes.filter(b => b.containerId === activeContainerId);
+
+                const groupBounds = {};
+
+                activeBoxes.forEach(b => {
+                    if (b.groupId && !b.groupIds) { b.groupIds = [b.groupId]; delete b.groupId; }
+                    if (!b.groupIds) b.groupIds = [];
+
+                    b.groupIds.forEach(gid => {
+                        if (!groupBounds[gid]) groupBounds[gid] = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, count: 0 };
+                        const g = groupBounds[gid];
+                        g.minX = Math.min(g.minX, b.x);
+                        g.minY = Math.min(g.minY, b.y);
+                        g.maxX = Math.max(g.maxX, b.x + b.width);
+                        g.maxY = Math.max(g.maxY, b.y + b.height);
+                        g.count++;
+                    });
+                });
+
+                Object.keys(groupBounds).forEach(gid => {
+                    const g = groupBounds[gid];
+                    if (g.count === 0) return;
+                    const padding = 15;
+                    const rect = document.createElement('div');
+                    rect.className = 'group-rect';
+                    rect.style.left = (g.minX - padding) + 'px';
+                    rect.style.top = (g.minY - padding) + 'px';
+                    rect.style.width = (g.maxX - g.minX + padding * 2) + 'px';
+                    rect.style.height = (g.maxY - g.minY + padding * 2) + 'px';
+
+                    // [색상 적용 로직]
+                    // 저장된 색이 있으면 사용, 없으면 기본 회색
+                    const baseColor = groupColors[gid] || '#999999';
+
+                    // 테두리는 조금 진하게 (투명도 0.5)
+                    rect.style.border = `2px dashed ${hexToRgba(baseColor, 0.6)}`;
+                    // 배경은 아주 연하게 (투명도 0.1)
+                    rect.style.background = hexToRgba(baseColor, 0.1);
+
+                    containerArea.appendChild(rect);
+                });
+            }
+            //==============
+            function renderBoxes() {
+                renderGroups();
+                document.querySelectorAll('.box').forEach(el => el.remove());
+
+                if (!activeContainerId) return;
+                const activeBoxes = boxes.filter(b => b.containerId === activeContainerId);
+                const activeContainer = containers.find(c => c.id === activeContainerId);
+                if (!activeContainer) return;
+
+                containerArea.style.backgroundColor = `rgb(${activeContainer.bg},${activeContainer.bg},${activeContainer.bg})`;
+
+                if (activeContainer.bgImage) {
+                    containerArea.style.backgroundImage = `url(${activeContainer.bgImage})`;
+                    const mode = activeContainer.bgMode || 'cover-center';
+                    containerArea.style.backgroundSize = ''; containerArea.style.backgroundPosition = '';
+                    switch (mode) {
+                        case 'contain-center': containerArea.style.backgroundSize = 'contain'; containerArea.style.backgroundPosition = 'center'; break;
+                        case 'contain-topleft': containerArea.style.backgroundSize = 'contain'; containerArea.style.backgroundPosition = 'top left'; break;
+                        case 'contain-topright': containerArea.style.backgroundSize = 'contain'; containerArea.style.backgroundPosition = 'top right'; break;
+                        case 'auto-center': containerArea.style.backgroundSize = 'auto'; containerArea.style.backgroundPosition = 'center'; break;
+                        case 'auto-topleft': containerArea.style.backgroundSize = 'auto'; containerArea.style.backgroundPosition = 'top left'; break;
+                        case 'stretch': containerArea.style.backgroundSize = '100% 100%'; containerArea.style.backgroundPosition = 'center'; break;
+                        case 'cover-center': default: containerArea.style.backgroundSize = 'cover'; containerArea.style.backgroundPosition = 'center'; break;
+                    }
+                } else {
+                    containerArea.style.backgroundImage = 'none';
+                }
+
+                activeBoxes.forEach(b => {
+                    if (!b) return;
+                    const div = document.createElement('div');
+                    div.dataset.id = b.id;
+                    div.className = b.type === 'dot' ? 'box dot' : 'box normal';
+                    div.textContent = b.text;
+                    div.style.left = b.x + 'px'; div.style.top = b.y + 'px';
+                    div.style.width = b.width + 'px'; div.style.height = b.height + 'px';
+
+
+
+
+                    // [기존 코드]
+                    div.style.background = b.color;
+
+                    // [아래 코드를 바로 밑에 추가하세요]
+                    // -----------------------------------------------------------
+                    const align = b.textAlign || 'center'; // 값이 없으면 중앙 정렬이 기본
+                    div.style.textAlign = align;
+
+                    // flex 레이아웃이므로 justify-content도 같이 맞춰줘야 자연스럽습니다.
+                    if (align === 'left') div.style.justifyContent = 'flex-start';
+                    else if (align === 'right') div.style.justifyContent = 'flex-end';
+                    else div.style.justifyContent = 'center';
+                    // -----------------------------------------------------------
+
+                    // [수정됨] 선택 순서에 따라 스타일 구분 (0번:기준/Red, 나머지:Blue)
+                    const selectionIndex = selectedBoxIds.indexOf(b.id);
+                    if (selectionIndex === 0) {
+                        div.classList.add('selected', 'primary'); // 기준: 빨강
+                    } else if (selectionIndex > 0) {
+                        div.classList.add('selected', 'secondary'); // 추가: 파랑
+                    }
+
+                    div.onmousedown = e => {
+                        if (isHandMode || isSpacePressed || e.button === 1) return;
+
+                        if (e.button !== 0) return; e.stopPropagation();
+                        // [★ 추가할 코드 시작] Alt + 클릭 시 그룹 전체 선택 기능
+                        if (e.altKey) {
+                            // 현재 박스가 속한 그룹 ID 확인
+                            const myGroupIds = b.groupIds || [];
+
+                            // 그룹이 있는 경우에만 실행
+                            if (myGroupIds.length > 0) {
+                                // 현재 화면(activeBoxes)에 있는 박스 중, 같은 그룹 ID를 하나라도 가진 박스 찾기
+                                const groupMembers = activeBoxes.filter(target =>
+                                    (target.groupIds || []).some(gid => myGroupIds.includes(gid))
+                                );
+
+                                // 찾은 그룹 멤버들을 선택 목록(selectedBoxIds)에 추가
+                                let changed = false;
+                                groupMembers.forEach(member => {
+                                    if (!selectedBoxIds.includes(member.id)) {
+                                        selectedBoxIds.push(member.id);
+                                        changed = true;
+                                    }
+                                });
+
+                                if (changed) {
+                                    renderBoxes(); // 화면 갱신하여 선택 표시
+                                    // 알림 메시지 (선택 사항)
+                                    // alert('그룹 전체가 선택되었습니다. 이제 탭을 Shift+Ctrl+클릭하여 이동하세요.');
+                                }
+                                return; // 이후 로직(단일 선택 등) 실행 방지
+                            }
+                        }
+                        // [★ 추가할 코드 끝]
+
+                        if (e.shiftKey) {
+                            if (selectedBoxIds.length === 0) return;
+
+                            // [핵심 기능] 기준 박스를 다시 Shift 클릭하면 너비 맞춤 실행
+                            if (selectedBoxIds.length > 1 && selectedBoxIds[0] === b.id) {
+                                matchWidthToFirst();
+                                return;
+                            }
+
+                            // 기존 연결 기능
+                            if (linkingBoxId && linkingBoxId !== b.id) {
+                                const exists = linkLines.find(l => l.from === linkingBoxId && l.to === b.id);
+                                if (!exists) linkLines.push({ from: linkingBoxId, to: b.id });
+                                linkingBoxId = null; renderBoxes(); pushHistory();
+                            } else { linkingBoxId = b.id; }
+                            return;
+                        }
+                        if (e.ctrlKey) {
+                            if (!selectedBoxIds.includes(b.id)) {
+                                selectedBoxIds.push(b.id); // 순서대로 추가됨
+                            }
+                            renderBoxes(); // 스타일 갱신
+                            dragSelectedBoxes(e); return;
+                        }
+
+                        // 일반 클릭 (다중 그룹 지원 수정)
+                        const isAlreadySelected = selectedBoxIds.includes(b.id);
+                        if (!isAlreadySelected) {
+                            // 구버전 호환
+                            if (b.groupId && !b.groupIds) { b.groupIds = [b.groupId]; delete b.groupId; }
+
+                            if (b.groupIds && b.groupIds.length > 0) {
+                                // 가장 최근(가장 바깥쪽) 그룹 ID 가져오기
+                                const currentTopGroupId = b.groupIds[b.groupIds.length - 1];
+                                // 해당 그룹 ID를 가진 모든 박스 선택
+                                const groupPeers = boxes.filter(x =>
+                                    x.containerId === activeContainerId &&
+                                    (x.groupId === currentTopGroupId || (x.groupIds && x.groupIds.includes(currentTopGroupId)))
+                                );
+                                selectedBoxIds = groupPeers.map(p => p.id);
+                            } else {
+                                selectedBoxIds = [b.id];
+                            }
+                            renderBoxes();
+                        }
+
+
+                        linkingBoxId = b.id;
+                        dragSelectedBoxes(e);
+                    };
+                    div.onclick = e => { e.stopPropagation(); };
+                    div.ondblclick = e => { e.stopPropagation(); if (b.type === 'dot' || e.shiftKey) return; editBoxText(div, b); };
+                    if (b.type !== 'dot') { const resizeHandle = document.createElement('div'); resizeHandle.className = 'resizeHandle'; div.appendChild(resizeHandle); resizeHandle.onmousedown = e => { resizeBox(div, b, e); }; }
+                    containerArea.appendChild(div);
+                });
+
+                // [추가할 코드] (updateLines() 직전)
+                if (window.MathJax) {
+                    MathJax.typesetPromise([containerArea]);
+                }
+                updateLines();
+            }
+
+            // [추가된 기능] 첫번째 박스 기준으로 너비 맞춤
+            function matchWidthToFirst() {
+                if (selectedBoxIds.length < 2) return alert('2개 이상의 박스를 선택해야 합니다.\n(빨간 박스 = 기준, 파란 박스 = 변경 대상)');
+
+                const primaryId = selectedBoxIds[0];
+                const primaryBox = boxes.find(b => b.id === primaryId);
+                if (!primaryBox) return;
+
+                const targetWidth = primaryBox.width;
+                let changeCount = 0;
+
+                selectedBoxIds.slice(1).forEach(id => {
+                    const targetBox = boxes.find(b => b.id === id);
+                    if (targetBox && targetBox.type !== 'dot') {
+                        targetBox.width = targetWidth;
+                        changeCount++;
+                    }
+                });
+
+                if (changeCount > 0) {
+                    renderBoxes();
+                    pushHistory();
+                    // 피드백 효과 (잠깐 반짝임)
+                    const primaryDiv = containerArea.querySelector(`.box[data-id="${primaryId}"]`);
+                    if (primaryDiv) {
+                        const originalOutline = primaryDiv.style.outline;
+                        primaryDiv.style.outline = "5px solid #ff0000";
+                        setTimeout(() => { renderBoxes(); }, 200);
+                    }
+                }
+            }
+
+            document.getElementById('matchWidthBtn').onclick = matchWidthToFirst;
+
+            function updateLines() {
+                document.querySelectorAll('.linkLine').forEach(l => l.remove());
+                const activeBoxes = boxes.filter(b => b.containerId === activeContainerId);
+                linkLines.forEach(l => {
+                    const from = activeBoxes.find(x => x.id === l.from); const to = activeBoxes.find(x => x.id === l.to); if (!from || !to) return;
+                    const x1 = from.x + from.width / 2, y1 = from.y + from.height / 2; const x2 = to.x + to.width / 2, y2 = to.y + to.height / 2;
+                    let length = Math.hypot(x2 - x1, y2 - y1); const angleRad = Math.atan2(y2 - y1, x2 - x1); const angleDeg = angleRad * 180 / Math.PI;
+                    const toW = to.width / 2; const toH = to.height / 2; const tanA = Math.abs(Math.tan(angleRad)); const boxRatio = toH / toW;
+                    let distToEdge = 0; if (tanA < boxRatio) distToEdge = Math.abs(toW / Math.cos(angleRad)); else distToEdge = Math.abs(toH / Math.sin(angleRad));
+                    length = length - distToEdge - 3; if (length < 0) length = 0;
+                    const line = document.createElement('div'); line.className = 'linkLine';
+                    if (l.hasArrow) line.classList.add('arrow'); if (l.color) line.classList.add(l.color);
+                    line.style.left = x1 + 'px'; line.style.top = y1 + 'px'; line.style.width = length + 'px'; line.style.transform = `rotate(${angleDeg}deg)`;
+                    line.onclick = ev => {
+                        ev.stopPropagation();
+                        if (ev.altKey) { linkLines = linkLines.filter(l2 => l2 !== l); }
+                        else if (ev.shiftKey) { if (!l.color) l.color = 'red'; else if (l.color === 'red') l.color = 'blue'; else l.color = null; }
+                        else { l.hasArrow = !l.hasArrow; }
+                        renderBoxes(); pushHistory();
+                    };
+                    containerArea.appendChild(line);
+                });
+            }
+
+            function editBoxText(div, boxData) {
+                if (div.querySelector('textarea')) return;
+                const textarea = document.createElement('textarea'); textarea.value = boxData.text;
+
+
+                //  삭제 할 수도 있음
+
+                textarea.style.cssText = `width:100%; height:100%; border:none; background:transparent;text-align:center; outline:none;  resize:none; overflow:hidden; font-family:"맑은 고딕",sans-serif; font-size:14px; line-height:1.4; padding:0; margin:0;`;
+                textarea.style.textAlign = boxData.textAlign || 'center'; // 이 줄 추가!
+
+
+
+                div.innerHTML = ''; div.appendChild(textarea); textarea.focus();
+                const autoResize = () => { textarea.style.height = '1px'; let newHeight = textarea.scrollHeight + 10; if (newHeight < 34) newHeight = 30; div.style.height = newHeight + 'px'; textarea.style.height = '100%'; };
+                textarea.addEventListener('input', autoResize); autoResize();
+                const saveInput = () => { boxData.text = textarea.value; textarea.style.height = '1px'; let finalHeight = textarea.scrollHeight + 10; if (finalHeight < 34) finalHeight = 30; boxData.height = finalHeight; renderBoxes(); pushHistory(); };
+                textarea.onkeydown = ev => { ev.stopPropagation(); if (ev.key === 'Escape') { renderBoxes(); } };
+                textarea.onblur = () => saveInput();
+            }
+
+            //====================
+
+            function cloneSelectedBoxes() {
+                if (selectedBoxIds.length === 0) return;
+                const idMap = {};
+                const newBoxes = [];
+
+                selectedBoxIds.forEach(bid => {
+                    const boxData = boxes.find(x => x.id == bid);
+                    if (!boxData) return;
+
+                    const newId = 'b' + Date.now() + Math.random().toString(16).slice(2);
+                    idMap[boxData.id] = newId;
+
+                    // [수정 핵심] groupId와 groupIds를 모두 분리해내고, 복제본에는 빈 배열을 할당
+                    const { groupId, groupIds, ...rest } = boxData;
+
+                    const clone = {
+                        ...rest,
+                        id: newId,
+                        x: boxData.x + 20,
+                        y: boxData.y + 20,
+                        groupIds: [] // 복제된 박스는 그룹이 없는 상태로 시작
+                    };
+
+                    newBoxes.push(clone);
+                    boxes.push(clone);
+                });
+
+                const newLinkLines = [];
+                linkLines.forEach(l => {
+                    const fromNew = idMap[l.from] || l.from;
+                    const toNew = idMap[l.to] || l.to;
+                    if (idMap[l.from] || idMap[l.to]) newLinkLines.push({ from: fromNew, to: toNew });
+                });
+
+                if (newLinkLines.length) linkLines = linkLines.concat(newLinkLines);
+                selectedBoxIds = newBoxes.map(b => b.id);
+                renderBoxes();
+                pushHistory();
+            }
+            //==================
+
+            function dragSelectedBoxes(e) {
+                if (e.detail === 2) return;
+                const targets = selectedBoxIds.map(id => boxes.find(b => b.id === id)).filter(b => b);
+                if (targets.length === 0) return;
+
+                const startPos = targets.map(b => ({ b, x: b.x, y: b.y }));
+                const containerRect = containerArea.getBoundingClientRect(); const startX = e.clientX, startY = e.clientY; let dragging = true;
+
+                const moveHandler = ev => {
+                    if (!dragging) return; const dx = ev.clientX - startX; const dy = ev.clientY - startY;
+                    startPos.forEach(pos => {
+                        let newX = pos.x + dx, newY = pos.y + dy;
+                        const boxWidth = pos.b.width, boxHeight = pos.b.height;
+                        const maxX = containerRect.width - boxWidth; const maxY = containerRect.height - boxHeight;
+                        newX = Math.max(0, Math.min(newX, maxX)); newY = Math.max(0, Math.min(newY, maxY));
+                        pos.b.x = newX; pos.b.y = newY;
+                    });
+                    renderBoxes();
+                };
+                const upHandler = ev => { dragging = false; document.removeEventListener('mousemove', moveHandler); document.removeEventListener('mouseup', upHandler); pushHistory(); };
+                document.addEventListener('mousemove', moveHandler); document.addEventListener('mouseup', upHandler);
+            }
+
+            function resizeBox(div, boxData, e) {
+                e.stopPropagation(); const startX = e.clientX, startY = e.clientY; const startW = div.offsetWidth, startH = div.offsetHeight;
+                const moveHandler = ev => { let newW = Math.max(50, startW + (ev.clientX - startX)); div.style.width = newW + 'px'; div.style.height = 'auto'; const minTextHeight = div.offsetHeight; let newH = startH + (ev.clientY - startY); newH = Math.max(30, newH, minTextHeight); div.style.height = newH + 'px'; boxData.width = parseInt(div.style.width); boxData.height = parseInt(div.style.height); };
+                const upHandler = ev => { document.removeEventListener('mousemove', moveHandler); document.removeEventListener('mouseup', upHandler); pushHistory(); };
+                document.addEventListener('mousemove', moveHandler); document.addEventListener('mouseup', upHandler);
+            }
+
+
+            window.groupSelectedBoxes = function () {
+                if (selectedBoxIds.length < 2) return alert("묶을 박스를 2개 이상 선택해주세요.");
+
+                // 고유한 그룹 ID 생성
+                const newGroupId = 'g_' + Date.now() + Math.random().toString(16).slice(2);
+
+                let count = 0;
+                selectedBoxIds.forEach(id => {
+                    const boxData = boxes.find(b => b.id === id);
+                    if (boxData) {
+                        // 그룹 ID 배열이 없으면 생성
+                        if (!boxData.groupIds) boxData.groupIds = [];
+
+                        // 구버전(문자열 groupId) 데이터 호환 처리
+                        if (boxData.groupId) {
+                            if (!boxData.groupIds.includes(boxData.groupId)) {
+                                boxData.groupIds.push(boxData.groupId);
+                            }
+                            delete boxData.groupId;
+                        }
+
+                        // 이미 같은 그룹에 속해있지 않은 경우에만 추가
+                        if (!boxData.groupIds.includes(newGroupId)) {
+                            boxData.groupIds.push(newGroupId);
+                            count++;
+                        }
+                    }
+                });
+
+                if (count > 0) {
+                    renderBoxes();
+                    pushHistory();
+                    // 피드백: 묶기 완료 시 선택된 박스들의 테두리를 잠깐 깜빡임
+                    alert(`✅ ${count}개의 박스가 묶였습니다.`);
+                }
+            };
+
+            window.ungroupSelectedBoxes = function () {
+                if (selectedBoxIds.length === 0) return;
+
+                selectedBoxIds.forEach(id => {
+                    const boxData = boxes.find(b => b.id === id);
+                    if (boxData) {
+                        // 구버전 호환 처리
+                        if (boxData.groupId && !boxData.groupIds) {
+                            boxData.groupIds = [boxData.groupId]; delete boxData.groupId;
+                        }
+
+                        // 가장 최근 그룹(배열의 마지막) 제거
+                        if (boxData.groupIds && boxData.groupIds.length > 0) {
+                            boxData.groupIds.pop();
+                        }
+                    }
+                });
+                renderBoxes(); pushHistory();
+            };
+
+            // [기존 코드 찾기] colors.forEach(c=>{ ... }) 부분의 sw.onclick을 아래로 교체
+
+            colors.forEach(c => {
+                const sw = document.createElement('div');
+                sw.className = 'color-swatch';
+                sw.style.background = c;
+
+                // [★ 수정할 코드] 클릭 이벤트
+                sw.onclick = (e) => {
+                    // Alt 키를 누르고 클릭하면 -> 선택된 박스가 속한 '그룹'의 색 변경
+                    if (e.altKey) {
+                        let changed = false;
+                        selectedBoxIds.forEach(id => {
+                            const box = boxes.find(b => b.id === id);
+                            if (box && box.groupIds) {
+                                box.groupIds.forEach(gid => {
+                                    groupColors[gid] = c; // 그룹 색상 저장
+                                    changed = true;
+                                });
+                            }
+                        });
+                        if (!changed) alert("선택된 박스에 그룹이 없습니다.");
+                    }
+                    // 그냥 클릭하면 -> 박스 색 변경 (기존 기능)
+                    else {
+                        selectedBoxIds.forEach(id => {
+                            const boxData = boxes.find(x => x.id == id);
+                            if (boxData) boxData.color = c;
+                        });
+                    }
+                    renderBoxes();
+                    pushHistory();
+                };
+                palette.appendChild(sw);
+            });
+
+
+
+
+            containerArea.addEventListener('mousedown', (e) => {
+                // 휠 버튼이나 스페이스바 모드일 때는 드래그 선택 방지
+                if (isHandMode || isSpacePressed || e.button === 1) return;
+
+                if (e.target !== containerArea) return;
+
+                // 시작 좌표 계산
+                const containerRect = containerArea.getBoundingClientRect();
+                dragStart = { x: e.clientX - containerRect.left, y: e.clientY - containerRect.top };
+
+                // 선택 박스 생성
+                dragSelectRect = document.createElement('div');
+                dragSelectRect.style.position = 'absolute';
+                dragSelectRect.style.border = '1px dashed #0099ff';
+                dragSelectRect.style.background = 'rgba(0,153,255,0.1)';
+                dragSelectRect.style.left = dragStart.x + 'px';
+                dragSelectRect.style.top = dragStart.y + 'px';
+                dragSelectRect.style.zIndex = 999; // 박스들보다 위에 오도록
+                dragSelectRect.style.pointerEvents = 'none'; // 마우스 이벤트가 통과되도록 설정 (중요)
+                containerArea.appendChild(dragSelectRect);
+
+                const moveHandler = ev => {
+                    // 컨테이너 기준 상대 좌표 계산
+                    const currentX = ev.clientX - containerRect.left;
+                    const currentY = ev.clientY - containerRect.top;
+
+                    const x = Math.min(currentX, dragStart.x);
+                    const y = Math.min(currentY, dragStart.y);
+                    const w = Math.abs(currentX - dragStart.x);
+                    const h = Math.abs(currentY - dragStart.y);
+
+                    dragSelectRect.style.left = x + 'px';
+                    dragSelectRect.style.top = y + 'px';
+                    dragSelectRect.style.width = w + 'px';
+                    dragSelectRect.style.height = h + 'px';
+                };
+
+                const upHandler = ev => {
+                    // 드래그 박스의 화면상 위치 가져오기
+                    const selectionRect = dragSelectRect.getBoundingClientRect();
+
+                    // 너무 작게 드래그한 경우(단순 클릭) 선택 취소 방지 등을 위해 최소 크기 체크 가능하나 여기선 패스
+
+                    // 기존 대장(Master) 기억
+                    const currentMasterId = selectedBoxIds.length > 0 ? selectedBoxIds[0] : null;
+
+                    // 선택 목록 초기화
+                    selectedBoxIds = [];
+
+                    // 현재 컨테이너의 박스들과 교차 검사
+                    boxes.filter(b => b.containerId === activeContainerId).forEach(b => {
+                        const boxDiv = containerArea.querySelector(`.box[data-id="${b.id}"]`);
+                        if (!boxDiv) return;
+
+                        const boxRect = boxDiv.getBoundingClientRect();
+
+                        // 교차(Overlap) 체크: 드래그 박스와 박스가 겹치는지 확인
+                        const isOverlap = !(selectionRect.right < boxRect.left ||
+                            selectionRect.left > boxRect.right ||
+                            selectionRect.bottom < boxRect.top ||
+                            selectionRect.top > boxRect.bottom);
+
+                        if (isOverlap) {
+                            selectedBoxIds.push(b.id);
+                        }
+                    });
+
+                    // 원래 대장이 선택 범위에 포함되어 있다면 대장 지위 유지
+                    if (currentMasterId && selectedBoxIds.includes(currentMasterId)) {
+                        selectedBoxIds = selectedBoxIds.filter(id => id !== currentMasterId);
+                        selectedBoxIds.unshift(currentMasterId);
+                    }
+
+                    renderBoxes();
+
+                    // 뒷정리
+                    if (dragSelectRect) dragSelectRect.remove();
+                    dragSelectRect = null;
+                    dragStart = null;
+                    pushHistory();
+
+                    document.removeEventListener('mousemove', moveHandler);
+                    document.removeEventListener('mouseup', upHandler);
+                };
+
+                document.addEventListener('mousemove', moveHandler);
+                document.addEventListener('mouseup', upHandler);
+            });
+
+
+
+
+
+            workspace.addEventListener('mousedown', (e) => {
+                if (isHandMode || isSpacePressed || e.button === 1) {
+                    e.preventDefault(); isPanning = true; panStartX = e.clientX; panStartY = e.clientY; scrollStartX = workspace.scrollLeft; scrollStartY = workspace.scrollTop; workspace.classList.add('grabbing');
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isPanning) return; e.preventDefault(); const dx = e.clientX - panStartX; const dy = e.clientY - panStartY; workspace.scrollLeft = scrollStartX - dx; workspace.scrollTop = scrollStartY - dy;
+            });
+
+            window.addEventListener('mouseup', () => { if (isPanning) { isPanning = false; workspace.classList.remove('grabbing'); } });
+
+            function alignSelectedBoxes(mode) {
+                if (selectedBoxIds.length < 2) return alert('2개 이상의 요소를 선택해주세요.');
+                const targets = selectedBoxIds.map(id => boxes.find(b => b.id === id)).filter(b => b);
+                if (targets.length === 0) return;
+                let minX = Math.min(...targets.map(b => b.x)); let maxX = Math.max(...targets.map(b => b.x + b.width)); let minY = Math.min(...targets.map(b => b.y)); let maxY = Math.max(...targets.map(b => b.y + b.height)); let centerX = (minX + maxX) / 2; let centerY = (minY + maxY) / 2;
+                targets.forEach(b => {
+                    switch (mode) { case 'left': b.x = minX; break; case 'center': b.x = centerX - (b.width / 2); break; case 'right': b.x = maxX - b.width; break; case 'top': b.y = minY; break; case 'middle': b.y = centerY - (b.height / 2); break; case 'bottom': b.y = maxY - b.height; break; }
+                }); renderBoxes(); pushHistory();
+            }
+            document.getElementById('alignLeftBtn').onclick = () => alignSelectedBoxes('left'); document.getElementById('alignCenterBtn').onclick = () => alignSelectedBoxes('center'); document.getElementById('alignRightBtn').onclick = () => alignSelectedBoxes('right'); document.getElementById('alignTopBtn').onclick = () => alignSelectedBoxes('top'); document.getElementById('alignMiddleBtn').onclick = () => alignSelectedBoxes('middle'); document.getElementById('alignBottomBtn').onclick = () => alignSelectedBoxes('bottom');
+
+            // [★ 추가] 현재 탭(컨테이너) 삭제 기능
+            document.getElementById('deleteContainerBtn').onclick = () => {
+                if (!activeContainerId) return alert('삭제할 탭이 없습니다.');
+                if (containers.length === 0) return;
+
+                const currentTab = containers.find(c => c.id === activeContainerId);
+                if (!confirm(`'${currentTab.name}' 탭을 정말 삭제하시겠습니까?\n(내부의 모든 박스도 함께 삭제됩니다)`)) return;
+
+                // 1. 해당 탭에 속한 박스들의 ID 찾기
+                const boxesToRemove = boxes.filter(b => b.containerId === activeContainerId).map(b => b.id);
+
+                // 2. 박스 및 연결선 데이터 삭제
+                boxes = boxes.filter(b => b.containerId !== activeContainerId);
+                linkLines = linkLines.filter(l => !boxesToRemove.includes(l.from) && !boxesToRemove.includes(l.to));
+
+                // 3. 컨테이너 배열에서 삭제
+                const idx = containers.findIndex(c => c.id === activeContainerId);
+                containers.splice(idx, 1);
+
+                // 4. 활성 탭 재설정 (이전 탭 혹은 다음 탭으로)
+                if (containers.length > 0) {
+                    // 삭제된 위치가 마지막이었다면 그 앞의 탭을, 아니면 그 자리의 탭을 선택
+                    const newIdx = Math.min(idx, containers.length - 1);
+                    activeContainerId = containers[newIdx].id;
+                } else {
+                    activeContainerId = null;
+                }
+
+                // 5. 화면 갱신 및 저장
+                renderTabs();
+                renderBoxes();
+                pushHistory();
+            };
+
+
+            document.getElementById('addContainerBtn').onclick = () => { const name = prompt('새 탭 이름 입력:'); if (name) createContainer(name); };
+            document.getElementById('addBoxBtn').onclick = () => { createBox('normal'); };
+            document.getElementById('addDotBtn').onclick = () => { createBox('dot'); };
+            const bgInput = document.getElementById('bgImageInput');
+            document.getElementById('setBgImgBtn').onclick = () => { if (!activeContainerId) return alert('컨테이너를 선택해주세요.'); bgInput.click(); };
+            bgInput.onchange = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (evt) => { const c = containers.find(x => x.id === activeContainerId); if (c) { c.bgImage = evt.target.result; renderBoxes(); pushHistory(); } }; reader.readAsDataURL(file); e.target.value = ''; };
+
+            document.getElementById('clearBgImgBtn').onclick = () => {
+                if (!activeContainerId) return; const c = containers.find(x => x.id === activeContainerId); if (c) { if (!c.bgImage) { alert('삭제할 배경 이미지가 없습니다.'); return; } if (confirm('정말 배경 이미지를 삭제하시겠습니까?')) { c.bgImage = null; renderBoxes(); pushHistory(); } }
+            };
+
+
+            function getTimestamp() {
+                const now = new Date();
+                return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+            }
+            // [★ 추가된 함수: 'single' 내보내기, 'all' 저장, 'saveas' 처리]
+            async function saveProject(mode) {
+                // function saveProject(mode) { ... } 내부
+
+                // ----------------------------------------------------------------------------------
+                // [★ 추가할 코드: 선택된 박스만 파일로 저장하는 로직]
+                // ----------------------------------------------------------------------------------
+                if (mode === 'selected') {
+                    if (selectedBoxIds.length === 0) {
+                        return alert('내보낼 박스를 하나 이상 선택해주세요.');
+                    }
+
+                    const currentC = containers.find(x => x.id === activeContainerId);
+                    if (!currentC) return alert('활성화된 탭이 없습니다.');
+
+                    // 1. 선택된 박스들 필터링
+                    const selectedBoxes = boxes.filter(b => selectedBoxIds.includes(b.id));
+
+                    // 2. 연결선 필터링 (선택된 박스들 사이의 연결선만)
+                    const selectedLines = linkLines.filter(l =>
+                        l.from && l.to && selectedBoxIds.includes(l.from) && selectedBoxIds.includes(l.to)
+                    );
+
+                    // 3. 그룹 정보 추출
+                    // 선택된 박스들이 포함된 그룹 ID를 모두 수집합니다.
+                    const uniqueGroupIds = [...new Set(selectedBoxes.flatMap(b => b.groupIds || []))];
+                    const selectedGroupColors = {};
+                    uniqueGroupIds.forEach(gid => {
+                        if (groupColors[gid]) {
+                            selectedGroupColors[gid] = groupColors[gid];
+                        }
+                    });
+
+                    // 4. Export 데이터 구조 생성 (컨테이너는 현재 활성 탭의 정보를 사용)
+                    const exportData = {
+                        // 컨테이너는 불러오기 시 새 탭을 만들기 위한 템플릿 역할만 합니다.
+                        containers: [currentC],
+                        boxes: selectedBoxes,
+                        linkLines: selectedLines,
+                        activeContainerId: currentC.id, // 불러오기 시 새 탭이 열리도록 처리
+                        groupColors: selectedGroupColors
+                    };
+
+                    const dataStr = JSON.stringify(exportData, null, 2);
+                    const blob = new Blob([dataStr], { type: 'application/json' });
+
+                    // 파일 이름 생성
+                    let safeName = (currentC.name || "Tab").replace(/[<>:"/\\|?*]/g, '').trim();
+                    if (safeName.length === 0) safeName = `Exported_Selection`;
+                    const fileName = `Selection_${safeName}_${getTimestamp()}.json`;
+
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+
+                    alert(`✅ [${fileName}] 내보내기 성공! (선택된 박스 ${selectedBoxIds.length}개)`);
+                    return;
+                }
+                // ----------------------------------------------------------------------------------
+                // (여기에 기존 'single' 모드 로직이 이어져야 합니다.)
+                // else if (mode === 'single') { ... }
+                if (!activeContainerId && mode !== 'all' && mode !== 'saveas') {
+                    return alert('활성화된 탭이 없습니다.');
+                }
+
+                // 'single' 모드: 현재 탭의 데이터만 추출하여 다운로드
+                if (mode === 'single') {
+                    const c = containers.find(x => x.id === activeContainerId);
+                    if (!c) return;
+
+                    const currentBoxes = boxes.filter(b => b.containerId === c.id);
+                    const ids = currentBoxes.map(b => b.id);
+                    const lines = linkLines.filter(l => l.from && l.to && ids.includes(l.from) && ids.includes(l.to));
+
+                    // 내보낼 데이터: 컨테이너, 박스, 연결선, 그룹 색상 포함
+                    const exportData = {
+                        containers: [c],
+                        boxes: currentBoxes,
+                        linkLines: lines,
+                        activeContainerId: c.id,
+                        groupColors: groupColors // 그룹 색상 데이터 포함
+                    };
+
+                    const dataStr = JSON.stringify(exportData, null, 2);
+                    const blob = new Blob([dataStr], { type: 'application/json' });
+
+                    let safeName = (c.name || "Tab").replace(/[<>:"/\\|?*]/g, '').trim();
+                    if (safeName.length === 0) safeName = `Exported_Tab`;
+                    const fileName = `${safeName}_${getTimestamp()}.json`;
+
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+
+                    alert(`✅ [${fileName}] 내보내기 성공! (현재 탭 데이터)`);
+                    return;
+                }
+                // 'all' 또는 'saveas'는 smartSave를 통해 파일 시스템 접근 API를 사용합니다.
+                else if (mode === 'all' || mode === 'saveas') {
+                    await saveProjectSmart(mode === 'saveas');
+                }
+                // 'folder' 모드는 기존 코드를 사용합니다. (Snippet 19 참조)
+                else if (mode === 'folder') {
+                    if (containers.length === 0) return alert('탭 없음');
+                    if (!window.showDirectoryPicker) return alert("PC 크롬/엣지 브라우저 필요");
+                    // ... (기존 폴더 백업 로직)
+                    // [파일이 불완전하므로 기존 로직은 여기에 생략하고, 원본 파일의 로직을 그대로 사용해야 함]
+                    alert("폴더 저장 기능은 원본 파일의 기존 로직을 사용합니다.");
+                }
+            }
+
+
+            document.getElementById('openProjectBtn').onclick = async () => {
+                try {
+                    const [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'JSON Project', accept: { 'application/json': ['.json'] } }], multiple: false });
+                    currentFileHandle = fileHandle; const file = await fileHandle.getFile(); const contents = await file.text();
+                    loadProjectData(contents);
+                    currentFileNameSpan.textContent = "📄 " + file.name; currentFileNameSpan.style.display = "inline-block";
+                    alert(`✅ [${file.name}] 열기 성공!\n이제 Ctrl+S를 누르면 이 파일에 바로 저장됩니다.`);
+                } catch (err) { if (err.name !== 'AbortError') alert("파일 열기 실패: " + err.message); }
+            };
+
+
+
+            //=============
+            function loadProjectData(jsonString) {
+                try {
+                    // 1. 여기서 'data'라는 변수가 비로소 만들어집니다.
+                    const data = JSON.parse(jsonString);
+
+                    if (!data.containers) throw new Error("데이터 형식 오류");
+
+                    containers = data.containers;
+                    boxes = data.boxes || [];
+                    linkLines = data.linkLines || [];
+                    activeContainerId = data.activeContainerId || (containers[0] ? containers[0].id : null);
+
+                    // [★ 수정할 위치] 반드시 'data'가 정의된 이 아랫부분에 넣어야 합니다.
+                    // 기존 파일에는 groupColors가 없으므로, 없으면 빈 객체({})를 쓰도록 처리합니다.
+                    groupColors = data.groupColors || {};
+
+                    renderTabs();
+                    renderBoxes();
+                    pushHistory();
+                } catch (err) {
+                    // 이 alert가 뜨지 않고 바깥의 catch가 잡아서 "파일 열기 실패"가 떴던 것입니다.
+                    alert('❌ 데이터 로드 오류: ' + err.message);
+                }
+            }
+
+
+            document.getElementById('executeSaveBtn').onclick = async () => {
+                const mode = document.getElementById('saveModeSelect').value;
+                await saveProject(mode);
+                if (mode === 'all') { await saveProjectSmart(); }
+                else if (mode === 'saveas') { await saveProjectAs(); }
+                else if (mode === 'single') {
+                    if (!activeContainerId) return alert('탭 없음'); const c = containers.find(x => x.id === activeContainerId); const currentBoxes = boxes.filter(b => b.containerId === activeContainerId); const ids = currentBoxes.map(b => b.id); const lines = linkLines.filter(l => ids.includes(l.from) && ids.includes(l.to)); const data = { containers: [c], boxes: currentBoxes, linkLines: lines, activeContainerId: activeContainerId }; const safeName = (c.name || "Tab").replace(/[<>:"/\\|?*]/g, '').trim(); downloadFile(`${getTimestamp()}_${safeName}.json`, JSON.stringify(data, null, 2));
+                }
+                else if (mode === 'folder') {
+                    if (containers.length === 0) return alert('탭 없음'); if (!window.showDirectoryPicker) return alert("PC 크롬/엣지 브라우저 필요");
+                    try { const dirHandle = await window.showDirectoryPicker(); const folderName = `${getTimestamp()}_Tabs`; const newDirHandle = await dirHandle.getDirectoryHandle(folderName, { create: true }); for (let i = 0; i < containers.length; i++) { const c = containers[i]; const currentBoxes = boxes.filter(b => b.containerId === c.id); const ids = currentBoxes.map(b => b.id); const lines = linkLines.filter(l => l.from && l.to && ids.includes(l.from) && ids.includes(l.to)); const data = { containers: [c], boxes: currentBoxes, linkLines: lines, activeContainerId: c.id }; let safeName = (c.name || "Tab").replace(/[<>:"/\\|?*]/g, '').trim(); if (safeName.length === 0) safeName = `Tab_${i + 1}`; const fileName = `${safeName}.json`; const fileHandle = await newDirHandle.getFileHandle(fileName, { create: true }); const writable = await fileHandle.createWritable(); await writable.write(JSON.stringify(data, null, 2)); await writable.close(); } alert(`✅ [${folderName}] 저장 완료`); } catch (err) { if (err.name !== 'AbortError') alert("오류: " + err.message); }
+                }
+            };
+
+            async function saveProjectSmart(forceSaveAs = false) {
+                const dataStr = JSON.stringify({ containers, boxes, linkLines, activeContainerId, groupColors }, null, 2);
+                if (currentFileHandle) {
+                    try {
+                        const writable = await currentFileHandle.createWritable(); await writable.write(dataStr); await writable.close();
+                        autoSaveMsg.textContent = "💾 저장 완료!"; autoSaveMsg.style.display = 'block'; setTimeout(() => { autoSaveMsg.style.display = 'none'; }, 2000);
+                    } catch (err) { alert("저장 실패: " + err.message); }
+                } else { await saveProjectAs(); }
+            }
+
+            // 추가
+
+            //추가 끝
+
+
+
+
+
+
+            async function saveProjectAs() {
+                const dataStr = JSON.stringify({ containers, boxes, linkLines, activeContainerId, groupColors }, null, 2);
+
+                try {
+                    const options = { suggestedName: `${getTimestamp()}_Project.json`, types: [{ description: 'JSON Project', accept: { 'application/json': ['.json'] } }] };
+                    const handle = await window.showSaveFilePicker(options); currentFileHandle = handle;
+                    const writable = await handle.createWritable(); await writable.write(dataStr); await writable.close();
+                    const file = await handle.getFile(); currentFileNameSpan.textContent = "📄 " + file.name; currentFileNameSpan.style.display = "inline-block"; alert(`✅ [${file.name}] 저장되었습니다.`);
+                } catch (err) { if (err.name !== 'AbortError') alert("저장 취소/실패"); }
+            }
+
+            function downloadFile(filename, content) { const blob = new Blob([content], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
+
+            document.getElementById('resetDataBtn').onclick = () => { if (confirm('정말 모든 데이터를 삭제하고 초기화하시겠습니까?')) { containers = []; boxes = []; linkLines = []; activeContainerId = null; selectedBoxIds = []; currentFileHandle = null; currentFileNameSpan.style.display = 'none'; localStorage.removeItem(STORAGE_KEY); document.querySelectorAll('.linkLine').forEach(el => el.remove()); document.querySelectorAll('.group-rect').forEach(el => el.remove()); renderTabs(); renderBoxes(); } };
+            document.getElementById('importBtn').onclick = () => { document.getElementById('importFile').click(); };
+
+
+
+
+            document.getElementById('importFile').onchange = ev => {
+                const file = ev.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (!data.containers || !data.boxes) throw new Error("프로젝트 형식이 올바르지 않습니다.");
+
+                        const idMap = {}; // 모든 ID를 맵핑할 객체
+
+                        // 1. 컨테이너(탭) ID 재할당 및 박스 연결
+                        if (data.containers.length > 0) {
+                            const oldCid = data.containers[0].id;
+                            // 새로운 고유 ID 생성
+                            const newCid = 'c' + Date.now() + Math.random().toString(16).slice(2);
+                            idMap[oldCid] = newCid;
+                            data.containers[0].id = newCid; // 컨테이너 객체 ID 업데이트
+
+                            // 해당 컨테이너의 모든 박스가 새 컨테이너 ID를 참조하도록 업데이트
+                            data.boxes.forEach(b => {
+                                // Export 파일은 하나의 탭만 포함하므로, 박스들은 이 컨테이너 ID를 가질 것입니다.
+                                if (b.containerId === oldCid) {
+                                    b.containerId = newCid;
+                                }
+                            });
+                        }
+
+                        // 2. 박스 및 그룹 ID 재할당
+                        if (data.boxes) data.boxes.forEach(b => {
+                            const newId = 'b' + Date.now() + Math.random().toString(16).slice(2);
+                            idMap[b.id] = newId;
+                            b.id = newId;
+
+                            // 그룹 ID 재할당 및 맵핑
+                            if (b.groupIds && b.groupIds.length > 0) {
+                                b.groupIds = b.groupIds.map(oldGid => {
+                                    if (!idMap[oldGid]) {
+                                        const newGid = 'g_' + Date.now() + Math.random().toString(16).slice(2);
+                                        idMap[oldGid] = newGid;
+                                    }
+                                    return idMap[oldGid];
+                                });
+                            }
+                        });
+
+                        // 3. 연결선 ID 업데이트
+                        const newLines = data.linkLines
+                            .filter(l => l.from && l.to && idMap[l.from] && idMap[l.to]) // 유효한 연결선만 필터링
+                            .map(l => ({ ...l, from: idMap[l.from], to: idMap[l.to] }));
+
+                        // 4. 그룹 색상 데이터 병합 (새 그룹 ID 사용)
+                        if (data.groupColors) {
+                            Object.keys(data.groupColors).forEach(oldGid => {
+                                const newGid = idMap[oldGid];
+                                // 새로운 그룹 ID가 있고, 기존 프로젝트에 없는 경우에만 추가
+                                if (newGid && !groupColors[newGid]) {
+                                    groupColors[newGid] = data.groupColors[oldGid];
+                                }
+                            });
+                        }
+
+                        // 5. 최종 데이터 병합 (중복된 .concat() 제거)
+                        containers.push(...data.containers);
+                        boxes.push(...data.boxes);
+                        linkLines.push(...newLines);
+
+                        // 활성 컨테이너를 불러온 파일의 첫 번째 탭(새 ID)으로 전환
+                        activeContainerId = data.containers[0].id;
+
+                        renderTabs();
+                        renderBoxes();
+                        pushHistory();
+                        alert('✅ 데이터 합치기 완료! (그룹 색상 및 ID 충돌 해결)');
+
+                    } catch (err) {
+                        alert('❌ 오류: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+                ev.target.value = '';
+            };
+            //끝
+            //
+
+
+
+
+
+            document.getElementById('exportPNG').onclick = () => {
+                if (!activeContainerId) return alert('탭 선택 필요');
+                const activeContainer = containers.find(c => c.id === activeContainerId);
+                if (!activeContainer) return;
+
+                const safeName = (activeContainer.name || "Map").replace(/[<>:"/\\|?*]/g, '').trim();
+
+                // [수정] scale: 3 옵션 추가 (인쇄 품질 향상 핵심)
+                const scaleFactor = 3;
+
+                html2canvas(containerArea, {
+                    allowTaint: true,
+                    useCORS: true,
+                    scale: scaleFactor // 해상도를 3배로 높임
+                }).then(canvas => {
+                    // 여백도 해상도 비율에 맞춰 늘려줌 (기본 60px * 3 = 180px)
+                    const padding = 60 * scaleFactor;
+
+                    const newCanvas = document.createElement('canvas');
+                    newCanvas.width = canvas.width + padding * 2;
+                    newCanvas.height = canvas.height + padding * 2;
+                    const ctx = newCanvas.getContext('2d');
+
+                    // 배경 흰색 채우기
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(0, 0, newCanvas.width, newCanvas.height);
+
+                    // 이미지 그리기
+                    ctx.drawImage(canvas, padding, padding);
+
+                    // 다운로드
+                    const a = document.createElement('a');
+                    // PNG 품질 향상
+                    a.href = newCanvas.toDataURL('image/png', 1.0);
+                    a.download = `${safeName}.png`;
+                    a.click();
+                });
+            };
+
+
+
+            document.getElementById('helpBtn').onclick = () => { document.getElementById('helpModal').style.display = 'flex'; };
+            document.getElementById('closeHelp').onclick = () => { document.getElementById('helpModal').style.display = 'none'; };
+
+        
+            document.addEventListener('keydown', e => {
+                if (e.repeat) return;
+                if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+                const key = e.key.toLowerCase(); const code = e.code; const ctrl = e.ctrlKey || e.metaKey; const shift = e.shiftKey;
+                if (code === 'Space') { isSpacePressed = true; workspace.classList.add('grab'); }
+                if (ctrl && (key === 's' || code === 'KeyS' || key === 'ㄴ')) { e.preventDefault(); saveProjectSmart(); return; }
+                if (ctrl && !shift && (key === 'z' || code === 'KeyZ' || key === 'ㅋ')) { e.preventDefault(); undo(); return; }
+                if (ctrl && (key === 'y' || code === 'KeyY' || (shift && (key === 'z' || code === 'KeyZ')))) { e.preventDefault(); redo(); return; }
+
+                // [복제 기능]
+                if (ctrl && (key === 'd' || code === 'KeyD')) { e.preventDefault(); cloneSelectedBoxes(); return; }
+
+                if (ctrl && (key === 'b' || code === 'KeyB' || key === 'ㅠ')) { e.preventDefault(); if (selectionHistoryStack.length === 0) return; const idsToRestore = selectionHistoryStack.pop(); selectedBoxIds = idsToRestore; renderBoxes(); return; }
+                if (code === 'Delete' || key === 'delete') { e.preventDefault(); if (selectedBoxIds.length === 0) return; boxes = boxes.filter(b => !selectedBoxIds.includes(b.id)); linkLines = linkLines.filter(l => !selectedBoxIds.includes(l.from) && !selectedBoxIds.includes(l.to)); selectedBoxIds = []; renderBoxes(); pushHistory(); }
+            });
+
+
+
+            document.addEventListener('keyup', e => {
+                if (e.code === 'Space') { isSpacePressed = false; if (!isHandMode) workspace.classList.remove('grab'); }
+            });
+
+            window.addEventListener('beforeunload', (e) => { e.preventDefault(); e.returnValue = ''; });
+
+            // 스크립트 아무 곳에나 추가 (예: window.groupSelectedBoxes 함수 근처)
+            window.setTextAlign = function (alignMode) {
+                if (selectedBoxIds.length === 0) return alert("글자 정렬을 변경할 박스를 선택해주세요.");
+
+                selectedBoxIds.forEach(id => {
+                    const box = boxes.find(b => b.id === id);
+                    if (box) {
+                        box.textAlign = alignMode;
+                    }
+                });
+                renderBoxes();
+                pushHistory(); // 실행 취소(Ctrl+Z)를 위해 기록 저장
+            };
+
+
+            loadFromLocalStorage(); renderTabs(); renderBoxes();
+
+
+            // [★ 추가할 코드] HEX 색상을 RGBA(투명도 포함)로 변환하는 함수
+            function hexToRgba(hex, alpha) {
+                let c;
+                if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
+                    c = hex.substring(1).split('');
+                    if (c.length == 3) {
+                        c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+                    }
+                    c = '0x' + c.join('');
+                    return 'rgba(' + [(c >> 16) & 255, (c >> 8) & 255, c & 255].join(',') + ',' + alpha + ')';
+                }
+                return hex; // 변환 실패 시 원본 반환
+            }
+
+        });
+
+
+    </script>
+</body>
+
+</html>
